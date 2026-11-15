@@ -34,6 +34,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+      - name: Tes ping server
+        run: |
+          python3 tes_ping.py | tee ping.txt
+          if [ -n "$NTFY_TOPIC" ]; then curl -s -d "$(sed "s/$SERVER_HOST/***/g" ping.txt)" "https://ntfy.sh/$NTFY_TOPIC" > /dev/null; fi
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
       - name: Jalankan bot
         run: |
           END=$((SECONDS+21000))
