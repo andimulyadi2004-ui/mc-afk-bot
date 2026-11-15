@@ -1,0 +1,6 @@
+{
+  "name": "mc-afk-bot",
+  "private": true,
+  "type": "module",
+  "dependencies": { "bedrock-protocol": "latest" }
+}

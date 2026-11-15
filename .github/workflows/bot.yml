@@ -1,0 +1,56 @@
+name: bot
+on:
+  workflow_dispatch:
+    inputs:
+      sisa:
+        description: "Sisa sesi"
+        default: "31"
+permissions:
+  actions: write
+  contents: read
+concurrency:
+  group: bot
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --ignore-scripts
+      - name: Pulihkan login Microsoft
+        run: |
+          mkdir -p auth
+          if [ -n "$MS_AUTH" ]; then echo "$MS_AUTH" | base64 -d | tar xz -C auth; fi
+        env:
+          MS_AUTH: ${{ secrets.MS_AUTH }}
+      - name: Antri sesi berikutnya
+        run: |
+          S=${{ inputs.sisa }}
+          if [ "$S" -gt 1 ]; then gh workflow run bot.yml -f sisa=$((S-1)); fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+      - name: Jalankan bot
+        run: |
+          END=$((SECONDS+21000))
+          while [ $SECONDS -lt $END ]; do
+            KODE=0
+            timeout $((END-SECONDS)) node bot.js || KODE=$?
+            if [ $KODE -eq 2 ] || [ $KODE -eq 3 ]; then
+              echo "Berhenti: login perlu diulang atau konfigurasi kurang (kode $KODE)"
+              for id in $(gh run list --status queued --json databaseId -q '.[].databaseId'); do gh run cancel $id; done
+              exit 1
+            fi
+            if [ $KODE -eq 4 ]; then sleep 300; else sleep 30; fi
+          done
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          MS_EMAIL: ${{ secrets.MS_EMAIL }}
+          AUTH_DIR: ./auth
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
