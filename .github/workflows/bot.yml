@@ -42,7 +42,7 @@ jobs:
             timeout $((END-SECONDS)) node bot.js || KODE=$?
             if [ $KODE -eq 2 ] || [ $KODE -eq 3 ]; then
               echo "Berhenti: login perlu diulang atau konfigurasi kurang (kode $KODE)"
-              for id in $(gh run list --status queued --json databaseId -q '.[].databaseId'); do gh run cancel $id; done
+              for st in queued pending waiting requested; do for id in $(gh run list --status $st --json databaseId -q '.[].databaseId'); do gh run cancel $id; done; done
               exit 1
             fi
             if [ $KODE -eq 4 ]; then sleep 300; else sleep 30; fi
