@@ -10,7 +10,7 @@ const LOGIN_ONLY = process.env.LOGIN_ONLY === "1";
 
 if (!HOST || !EMAIL) {
   console.error("SERVER_HOST atau MS_EMAIL belum diisi");
-  process.exit(3);
+  keluar(3);
 }
 
 const KECEPATAN = 0.2158;
@@ -33,9 +33,45 @@ let vy = 0;
 let y0 = 0;
 let mulaiLompat = false;
 
+const NTFY = process.env.NTFY_TOPIC;
+const sudahKirim = new Map();
+let jumlahJam = 0;
+setInterval(() => {
+  jumlahJam = 0;
+}, 3600000);
+
+function keLog(teks) {
+  if (!NTFY) return;
+  let t = String(teks);
+  if (HOST) t = t.split(HOST).join("***");
+  t = t.slice(0, 300);
+  const sekarang = Date.now();
+  if ((sudahKirim.get(t) ?? 0) > sekarang - 600000) return;
+  if (jumlahJam >= 100) return;
+  sudahKirim.set(t, sekarang);
+  jumlahJam++;
+  fetch("https://ntfy.sh/" + NTFY, { method: "POST", body: t }).catch(() => {});
+}
+
+function keluar(kode) {
+  setTimeout(() => process.exit(kode), 2000);
+}
+
+const logAsli = console.log;
+const errAsli = console.error;
+console.log = (...a) => {
+  logAsli(...a);
+  keLog(a.map((x) => x?.message ?? x).join(" "));
+};
+console.error = (...a) => {
+  errAsli(...a);
+  keLog("ERROR: " + a.map((x) => x?.message ?? x).join(" "));
+};
+console.log("Bot mulai, mencoba masuk server...");
+
 process.on("uncaughtException", (e) => {
   console.error("Error tak tertangkap:", e?.message ?? e);
-  process.exit(1);
+  keluar(1);
 });
 
 let client;
@@ -51,20 +87,20 @@ try {
     onMsaCode: (kode) => {
       if (CI) {
         console.error("Login Microsoft perlu diulang: jalankan bash ~/mc-login.sh di Termux");
-        process.exit(2);
+        keluar(2);
       }
       console.log(kode.message ?? `Buka https://www.microsoft.com/link dan masukkan kode ${kode.user_code}`);
     },
   });
 } catch (e) {
   console.error("Gagal membuat koneksi:", e?.message ?? e);
-  process.exit(3);
+  keluar(3);
 }
 
 if (LOGIN_ONLY) {
   setTimeout(() => {
     console.error("Belum berhasil masuk server dalam 15 menit");
-    process.exit(1);
+    keluar(1);
   }, 900000);
 }
 
@@ -183,7 +219,7 @@ client.on("spawn", () => {
   console.log("Bot masuk server");
   if (LOGIN_ONLY) {
     console.log("Login tersimpan");
-    setTimeout(() => process.exit(0), 3000);
+    setTimeout(() => keluar(0), 3000);
     return;
   }
   if (!posisi) {
@@ -201,13 +237,13 @@ client.on("spawn", () => {
 
 client.on("kick", (p) => {
   console.error("Dikeluarkan dari server:", JSON.stringify(p).slice(0, 200));
-  process.exit(4);
+  keluar(4);
 });
 client.on("close", () => {
   console.error("Koneksi terputus");
-  process.exit(1);
+  keluar(1);
 });
 client.on("error", (e) => {
   console.error("Error:", e?.message ?? e);
-  process.exit(1);
+  keluar(1);
 });

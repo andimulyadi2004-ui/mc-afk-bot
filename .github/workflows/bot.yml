@@ -52,5 +52,6 @@ jobs:
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
           MS_EMAIL: ${{ secrets.MS_EMAIL }}
           AUTH_DIR: ./auth
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
