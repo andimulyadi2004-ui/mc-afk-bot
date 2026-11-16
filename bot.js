@@ -83,7 +83,9 @@ try {
     username: EMAIL,
     offline: false,
     profilesFolder: AUTH_DIR,
-    raknetBackend: "jsp-raknet",
+    ...(process.env.RAKNET_BACKEND ? { raknetBackend: process.env.RAKNET_BACKEND } : {}),
+    connectTimeout: 30000,
+    conLog: (...a) => console.log(...a),
     onMsaCode: (kode) => {
       if (CI) {
         console.error("Login Microsoft perlu diulang: jalankan bash ~/mc-login.sh di Termux");
@@ -195,6 +197,8 @@ function mulaiGerak() {
     sisa = LANGKAH;
   }
 }
+
+client.on("join", () => console.log("Login diterima server"));
 
 client.on("start_game", (p) => {
   runtimeId = p.runtime_entity_id;
