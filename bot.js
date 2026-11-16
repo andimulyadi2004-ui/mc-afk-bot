@@ -1,4 +1,5 @@
 import bedrock from "bedrock-protocol";
+import fs from "node:fs";
 
 const HOST = process.env.SERVER_HOST;
 const PORT = parseInt(process.env.SERVER_PORT || "19132", 10);
@@ -17,6 +18,9 @@ const KECEPATAN = 0.2158;
 const LANGKAH = 14;
 const JEDA_MS = 60000;
 const YAW = 0;
+const GERAK_MATI = process.env.GERAK === "0" || fs.existsSync("gagal-gerak.flag");
+let waktuSpawn = 0;
+let paketTerkirim = 0;
 const MODEL_INTERAKSI = ["classic", "touch", "crosshair"];
 
 let posisi = null;
@@ -106,46 +110,88 @@ if (LOGIN_ONLY) {
   }, 900000);
 }
 
+const BIT = {
+  jump_down: 3,
+  jumping: 6,
+  up: 10,
+  down: 11,
+  start_jumping: 31,
+  jump_pressed_raw: 60,
+  jump_current_raw: 61,
+};
+
+function bitset(nama) {
+  const b = new Array(10).fill(0);
+  for (const n of nama) {
+    const i = BIT[n];
+    if (i === undefined) continue;
+    b[Math.floor(i / 7)] |= 1 << (i % 7);
+  }
+  return Buffer.from(b.map((v, i) => (i < 9 ? v | 0x80 : v)));
+}
+
+function varint64(n) {
+  const out = [];
+  let v = BigInt(n);
+  while (v >= 0x80n) {
+    out.push(Number((v & 0x7fn) | 0x80n));
+    v >>= 7n;
+  }
+  out.push(Number(v));
+  return Buffer.from(out);
+}
+
+function f32(x) {
+  const b = Buffer.alloc(4);
+  b.writeFloatLE(x);
+  return b;
+}
+
 function kirim(flags, mv, delta) {
   tick += 1n;
-  const paket = {
-    pitch: 0,
-    yaw: YAW,
-    position: { x: posisi.x, y: posisi.y, z: posisi.z },
-    move_vector: mv,
-    head_yaw: YAW,
-    input_data: Object.keys(flags).filter((k) => flags[k]),
-    input_mode: "mouse",
-    play_mode: "screen",
-    interaction_model: MODEL_INTERAKSI[idxModel],
-    interact_rotation: { x: 0, z: YAW },
-    tick,
-    delta,
-    transaction_presence: false,
-    item_stack_request_presence: false,
-    block_action_presence: false,
-    vehicle_rotation_presence: false,
-    predicted_vehicle_presence: false,
-    analogue_move_vector: mv,
-    camera_orientation: { x: 0, y: 0, z: 1 },
-    raw_move_vector: mv,
-  };
+  const paket = Buffer.concat([
+    Buffer.from([0x90, 0x01]),
+    f32(0),
+    f32(YAW),
+    f32(posisi.x),
+    f32(posisi.y),
+    f32(posisi.z),
+    f32(mv.x),
+    f32(mv.z),
+    f32(YAW),
+    bitset(Object.keys(flags).filter((k) => flags[k])),
+    Buffer.from([1, 0, 0]),
+    f32(0),
+    f32(YAW),
+    varint64(tick),
+    f32(delta.x),
+    f32(delta.y),
+    f32(delta.z),
+    f32(mv.x),
+    f32(mv.z),
+    f32(0),
+    f32(0),
+    f32(1),
+    f32(mv.x),
+    f32(mv.z),
+  ]);
   try {
-    client.write("player_auth_input", paket);
+    client.sendBuffer(paket, true);
     galat = 0;
+    paketTerkirim++;
+    if (paketTerkirim === 1) console.log("Paket gerak pertama terkirim");
   } catch (e) {
     galat++;
-    idxModel = (idxModel + 1) % MODEL_INTERAKSI.length;
     if (galat <= 3) console.error("Gagal kirim gerakan:", e?.message ?? e);
     if (galat >= 6) {
       gerakAktif = false;
-      console.error("Gerakan dimatikan karena format paket tidak cocok, bot tetap AFK di server");
+      console.error("Gerakan dimatikan karena paket tidak bisa dikirim, bot tetap AFK di server");
     }
   }
 }
 
 function langkah() {
-  if (!siap || !posisi || !gerakAktif || process.env.GERAK === "0") return;
+  if (!siap || !posisi || !gerakAktif || GERAK_MATI) return;
   let flags = {};
   let mv = { x: 0, z: 0 };
   const delta = { x: 0, y: 0, z: 0 };
@@ -238,7 +284,8 @@ client.on("spawn", () => {
     return;
   }
   awal = { ...posisi };
-  console.log("Posisi awal:", Math.round(posisi.x), Math.round(posisi.y), Math.round(posisi.z), "gerakan", process.env.GERAK === "0" ? "MATI" : "aktif");
+  waktuSpawn = Date.now();
+  console.log("Posisi awal:", Math.round(posisi.x), Math.round(posisi.y), Math.round(posisi.z), "gerakan", GERAK_MATI ? "MATI" : "aktif");
   siap = true;
   setInterval(langkah, 50);
   setTimeout(() => {
@@ -253,6 +300,12 @@ client.on("kick", (p) => {
 });
 client.on("close", (alasan) => {
   console.error("Koneksi terputus", alasan ?? "");
+  if (paketTerkirim > 0 && waktuSpawn && Date.now() - waktuSpawn < 20000 && !GERAK_MATI) {
+    try {
+      fs.writeFileSync("gagal-gerak.flag", "1");
+    } catch {}
+    console.error("Server memutus koneksi tak lama setelah paket gerak; sesi berikutnya bot AFK tanpa paket");
+  }
   keluar(1);
 });
 client.on("error", (e) => {
