@@ -1,0 +1,10 @@
+const fs = require("fs");
+const cp = require("child_process");
+const f = cp.execSync('find node_modules -path "*bedrock/1.26.40/protocol.json" | head -1').toString().trim();
+console.log("file:", f || "TIDAK KETEMU");
+if (!f) process.exit(1);
+const t = JSON.parse(fs.readFileSync(f)).types;
+const lihat = (x) => JSON.stringify(x).slice(0, 2600);
+console.log(lihat(t.packet_player_auth_input));
+console.log("--- InputFlag");
+console.log(lihat(t.InputFlag));

@@ -114,13 +114,18 @@ function kirim(flags, mv, delta) {
     position: { x: posisi.x, y: posisi.y, z: posisi.z },
     move_vector: mv,
     head_yaw: YAW,
-    input_data: flags,
+    input_data: Object.keys(flags).filter((k) => flags[k]),
     input_mode: "mouse",
     play_mode: "screen",
     interaction_model: MODEL_INTERAKSI[idxModel],
     interact_rotation: { x: 0, z: YAW },
     tick,
     delta,
+    transaction_presence: false,
+    item_stack_request_presence: false,
+    block_action_presence: false,
+    vehicle_rotation_presence: false,
+    predicted_vehicle_presence: false,
     analogue_move_vector: mv,
     camera_orientation: { x: 0, y: 0, z: 1 },
     raw_move_vector: mv,
@@ -185,6 +190,7 @@ function langkah() {
       posisi.y = y0;
       vy = 0;
       fase = "diam";
+      console.log("Putaran selesai: maju, mundur, lompat");
     }
     delta.y = posisi.y - yLama;
   }
@@ -195,6 +201,7 @@ function mulaiGerak() {
   if (fase === "diam" && siap && gerakAktif) {
     fase = "maju";
     sisa = LANGKAH;
+    console.log("Mulai gerakan: maju");
   }
 }
 
@@ -237,7 +244,7 @@ client.on("spawn", () => {
   setTimeout(() => {
     mulaiGerak();
     setInterval(mulaiGerak, JEDA_MS);
-  }, 15000);
+  }, 60000);
 });
 
 client.on("kick", (p) => {
