@@ -46,11 +46,11 @@ function keLog(teks) {
   if (HOST) t = t.split(HOST).join("***");
   t = t.slice(0, 300);
   const sekarang = Date.now();
-  if ((sudahKirim.get(t) ?? 0) > sekarang - 600000) return;
+  if ((sudahKirim.get(t) ?? 0) > sekarang - 60000) return;
   if (jumlahJam >= 100) return;
   sudahKirim.set(t, sekarang);
   jumlahJam++;
-  fetch("https://ntfy.sh/" + NTFY, { method: "POST", body: t }).catch(() => {});
+  fetch("https://ntfy.sh/" + NTFY, { method: "POST", body: "[+" + Math.round(process.uptime()) + "s] " + t }).catch(() => {});
 }
 
 function keluar(kode) {
@@ -140,7 +140,7 @@ function kirim(flags, mv, delta) {
 }
 
 function langkah() {
-  if (!siap || !posisi || !gerakAktif) return;
+  if (!siap || !posisi || !gerakAktif || process.env.GERAK === "0") return;
   let flags = {};
   let mv = { x: 0, z: 0 };
   const delta = { x: 0, y: 0, z: 0 };
@@ -231,6 +231,7 @@ client.on("spawn", () => {
     return;
   }
   awal = { ...posisi };
+  console.log("Posisi awal:", Math.round(posisi.x), Math.round(posisi.y), Math.round(posisi.z), "gerakan", process.env.GERAK === "0" ? "MATI" : "aktif");
   siap = true;
   setInterval(langkah, 50);
   setTimeout(() => {
@@ -243,8 +244,8 @@ client.on("kick", (p) => {
   console.error("Dikeluarkan dari server:", JSON.stringify(p).slice(0, 200));
   keluar(4);
 });
-client.on("close", () => {
-  console.error("Koneksi terputus");
+client.on("close", (alasan) => {
+  console.error("Koneksi terputus", alasan ?? "");
   keluar(1);
 });
 client.on("error", (e) => {
