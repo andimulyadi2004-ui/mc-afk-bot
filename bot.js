@@ -18,7 +18,7 @@ const KECEPATAN = 0.2158;
 const LANGKAH = 14;
 const JEDA_MS = 60000;
 const YAW = 0;
-const GERAK_MATI = process.env.GERAK === "0" || fs.existsSync("gagal-gerak.flag");
+const GERAK_MATI = process.env.GERAK !== "1" || fs.existsSync("gagal-gerak.flag");
 let waktuSpawn = 0;
 let paketTerkirim = 0;
 const MODEL_INTERAKSI = ["classic", "touch", "crosshair"];
@@ -285,7 +285,7 @@ const JOKES = [
   "Apa bedanya kasur sama pacar? Kasur nggak pernah bilang kamu berubah.",
   "Kenapa Alex kuat? Karena rajin makan roti tiap hari.",
 ];
-const CHAT_AKTIF_AWAL = process.env.CHAT !== "0" && !fs.existsSync("gagal-chat.flag");
+const CHAT_AKTIF_AWAL = process.env.CHAT === "1" && !fs.existsSync("gagal-chat.flag");
 let tasJoke = [];
 let chatTerkirim = 0;
 let waktuChatPertama = 0;
@@ -357,6 +357,7 @@ client.on("spawn", () => {
   }
   awal = { ...posisi };
   waktuSpawn = Date.now();
+  if (GERAK_MATI && !CHAT_AKTIF_AWAL) console.log("Mode AFK murni: tanpa gerak dan tanpa chat");
   console.log("Posisi awal:", Math.round(posisi.x), Math.round(posisi.y), Math.round(posisi.z), "gerakan", GERAK_MATI ? "MATI" : "aktif");
   siap = true;
   setInterval(langkah, 50);
@@ -374,7 +375,7 @@ client.on("spawn", () => {
 
 client.on("kick", (p) => {
   console.error("Dikeluarkan dari server:", JSON.stringify(p).slice(0, 200));
-  keluar(4);
+  keluar(/idle|afk|timeout/i.test(JSON.stringify(p)) ? 1 : 4);
 });
 client.on("close", (alasan) => {
   console.error("Koneksi terputus", alasan ?? "");
