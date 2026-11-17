@@ -253,6 +253,78 @@ function mulaiGerak() {
 
 client.on("join", () => console.log("Login diterima server"));
 
+const JOKES = [
+  "Kenapa ayam nyebrang jalan? Karena kalau nyebrang laut kejauhan.",
+  "Kenapa Creeper nggak punya teman? Karena tiap dekat langsung meledak emosinya.",
+  "Kenapa Steve selalu bawa kasur? Biar bisa skip malam.",
+  "Kenapa skeleton nggak ke pesta? Soalnya nggak ada yang diajak, no body.",
+  "Kenapa Enderman jago petak umpet? Soalnya kalau dilihat langsung marah.",
+  "Kenapa pickaxe selalu optimis? Karena selalu lihat sisi diamond.",
+  "Apa warna favorit Creeper? Hijau, tapi kalau meledak jadi merah padam.",
+  "Kenapa babi di Minecraft nggak pernah diet? Makannya wortel doang tapi tetap bulat.",
+  "Kenapa ayam di Minecraft rajin bertelur? Karena nggak ada lembur, kerjaannya cuma itu.",
+  "Apa bedanya kamu sama bedrock? Bedrock susah dihancurin, kamu susah dihubungi.",
+  "Kenapa torch nggak pernah kesepian? Soalnya selalu jadi pusat perhatian.",
+  "Kenapa wither nggak punya hobi? Soalnya semua yang dia sentuh langsung hilang.",
+  "Kenapa komputer sering kedinginan? Karena banyak Windows yang kebuka.",
+  "Apa persamaan kamu sama WiFi? Sama-sama sering putus pas lagi dibutuhin.",
+  "Buah apa yang paling sabar? Jeruk, sudah diperas masih tetap manis.",
+  "Kenapa matematika sedih? Karena punya banyak masalah.",
+  "Apa bedanya aku sama kalkulator? Kalkulator bisa ngitung, aku cuma bisa ngitung hari ke gajian.",
+  "Kenapa listrik padam? Karena dia capek nyala terus.",
+  "Kenapa nasi goreng nggak pernah sendirian? Karena selalu ditemenin telur.",
+  "Hewan apa yang paling rajin? Semut, kerjanya baris terus.",
+  "Apa bedanya HP sama kamu? HP bisa di-charge, kamu butuh tidur.",
+  "Kenapa ikan nggak bisa main game? Takut kena jaring.",
+  "Kenapa pensil sering dihapus? Karena salahnya banyak tapi tetap mau ditulis lagi.",
+  "Kenapa kopi nggak pernah bohong? Karena pahitnya jujur.",
+  "Apa bedanya zombie sama aku hari Senin? Zombie masih semangat jalan.",
+  "Kenapa lava panas? Karena dia nggak pernah dingin ke siapa-siapa.",
+  "Kenapa villager suka bilang hmm? Karena kata-katanya belum dibayar.",
+  "Kenapa cermin nggak pernah ketinggalan gosip? Karena dia selalu melihat semuanya.",
+  "Apa bedanya kasur sama pacar? Kasur nggak pernah bilang kamu berubah.",
+  "Kenapa Alex kuat? Karena rajin makan roti tiap hari.",
+];
+const CHAT_AKTIF_AWAL = process.env.CHAT !== "0" && !fs.existsSync("gagal-chat.flag");
+let tasJoke = [];
+let chatTerkirim = 0;
+let waktuChatPertama = 0;
+let galatChat = 0;
+let chatAktif = true;
+
+function jokeBerikut() {
+  if (!tasJoke.length) tasJoke = [...JOKES].sort(() => Math.random() - 0.5);
+  return tasJoke.pop();
+}
+
+function kirimJoke() {
+  if (!chatAktif) return;
+  try {
+    client.write("text", {
+      type: "chat",
+      needs_translation: false,
+      source_name: client.profile?.name ?? "",
+      xuid: client.profile?.xuid ?? "",
+      platform_chat_id: "",
+      filtered_message: "",
+      message: jokeBerikut(),
+    });
+    galatChat = 0;
+    chatTerkirim++;
+    if (chatTerkirim === 1) {
+      waktuChatPertama = Date.now();
+      console.log("Joke pertama terkirim, selanjutnya tiap 30 detik");
+    }
+  } catch (e) {
+    galatChat++;
+    if (galatChat <= 3) console.error("Gagal kirim chat:", e?.message ?? e);
+    if (galatChat >= 3) {
+      chatAktif = false;
+      console.error("Chat dimatikan karena paket tidak bisa dikirim, bot tetap AFK");
+    }
+  }
+}
+
 client.on("start_game", (p) => {
   runtimeId = p.runtime_entity_id;
   if (p.player_position) {
@@ -288,6 +360,12 @@ client.on("spawn", () => {
   console.log("Posisi awal:", Math.round(posisi.x), Math.round(posisi.y), Math.round(posisi.z), "gerakan", GERAK_MATI ? "MATI" : "aktif");
   siap = true;
   setInterval(langkah, 50);
+  if (CHAT_AKTIF_AWAL) {
+    setTimeout(() => {
+      kirimJoke();
+      setInterval(kirimJoke, 30000);
+    }, 10000);
+  }
   setTimeout(() => {
     mulaiGerak();
     setInterval(mulaiGerak, JEDA_MS);
@@ -300,6 +378,12 @@ client.on("kick", (p) => {
 });
 client.on("close", (alasan) => {
   console.error("Koneksi terputus", alasan ?? "");
+  if (chatTerkirim > 0 && waktuChatPertama && Date.now() - waktuChatPertama < 20000 && CHAT_AKTIF_AWAL) {
+    try {
+      fs.writeFileSync("gagal-chat.flag", "1");
+    } catch {}
+    console.error("Server memutus koneksi tak lama setelah chat; sesi berikutnya bot AFK tanpa chat");
+  }
   if (paketTerkirim > 0 && waktuSpawn && Date.now() - waktuSpawn < 20000 && !GERAK_MATI) {
     try {
       fs.writeFileSync("gagal-gerak.flag", "1");
